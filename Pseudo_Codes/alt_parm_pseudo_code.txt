@@ -1,0 +1,147 @@
+BEGIN PROGRAM PARM
+
+    DEFINE CLASS PTree
+        PUBLIC:
+            INTEGER rootCount
+            2D ARRAY tree
+
+            METHOD PTree(size):
+                SET rootCount TO 0
+                RESIZE tree TO size x size FILLED WITH 0
+
+            STATIC METHOD AND(ptree1, ptree2):
+                SET size TO ptree1.tree.size
+                CREATE NEW PTree result WITH size
+                FOR EACH i FROM 0 TO size-1:
+                    FOR EACH j FROM 0 TO size-1:
+                        SET result.tree[i][j] TO (ptree1.tree[i][j] AND ptree2.tree[i][j])
+                        SET result.rootCount TO result.rootCount + result.tree[i][j]
+                RETURN result
+
+            METHOD buildTree(data):
+                FOR EACH i FROM 0 TO size-1:
+                    FOR EACH j FROM 0 TO size-1:
+                        SET tree[i][j] TO data[i][j]
+                        SET rootCount TO rootCount + data[i][j]
+
+            METHOD printTree():
+                PRINT "P-tree root count: " + rootCount
+                FOR EACH row IN tree:
+                    FOR EACH val IN row:
+                        PRINT val WITH SPACE
+                    PRINT NEWLINE
+
+    END CLASS
+
+    DEFINE CLASS PARM
+        PRIVATE:
+            LIST OF PTree bandPtrees
+            INTEGER minSupport
+            FLOAT minConfidence
+            INTEGER gridSize
+            LIST OF PAIR (LIST OF INTEGER, INTEGER) frequentItemsets
+
+        PUBLIC:
+            METHOD PARM(gridSize, minSupport, minConfidence):
+                SET gridSize, minSupport, minConfidence
+
+            METHOD buildPTrees(data):
+                FOR EACH bandData IN data:
+                    CREATE PTree ptree WITH gridSize
+                    CALL ptree.buildTree(bandData)
+                    ADD ptree TO bandPtrees
+
+            METHOD mineFrequentItemsets():
+                PRINT "Frequent Itemsets and Association Rules:"
+                FOR EACH i FROM 0 TO (bandPtrees.size - 2):
+                    FOR EACH j FROM (i + 1) TO (bandPtrees.size - 1):
+                        SET result TO PTree.AND(bandPtrees[i], bandPtrees[j])
+                        IF result.rootCount >= minSupport THEN
+                            PRINT "Frequent itemset found between band " + (i + 1) + " and band " + (j + 1) + ": Support = " + result.rootCount
+                            CALL result.printTree()
+                            ADD ( [i, j], result.rootCount ) TO frequentItemsets
+
+            METHOD generateAssociationRules():
+                PRINT "\nAssociation Rules:"
+                FOR EACH (itemset, supportXY) IN frequentItemsets:
+                    FOR EACH item IN itemset:
+                        INITIALIZE empty list X
+                        INITIALIZE empty list Y
+                        FOR EACH elem IN itemset:
+                            IF elem == item THEN
+                                ADD elem TO Y
+                            ELSE
+                                ADD elem TO X
+                        IF X IS NOT EMPTY AND Y IS NOT EMPTY THEN
+                            SET supportX TO bandPtrees[X[0]].rootCount
+                            SET confidence TO supportXY / supportX
+                            IF confidence >= minConfidence THEN
+                                PRINT "Rule: {" + LIST(X) + "} -> {" + LIST(Y) + "} with confidence: " + (confidence * 100) + "%"
+
+    END CLASS
+
+    FUNCTION readDataset(filename, gridSize) RETURNS 3D ARRAY
+        OPEN file WITH filename
+        IF file CANNOT BE OPENED THEN
+            PRINT "Error: Could not open file."
+            RETURN EMPTY LIST
+        END IF
+
+        INITIALIZE empty list data
+        INITIALIZE empty list bandData
+
+        WHILE NOT END OF FILE DO
+            READ line FROM file
+            IF line IS EMPTY OR line EQUALS "----" THEN
+                IF bandData IS NOT EMPTY THEN
+                    ADD bandData TO data
+                    CLEAR bandData
+                END IF
+            ELSE
+                INITIALIZE empty list row
+                SPLIT line BY SPACE INTO tokens
+                FOR EACH token IN tokens DO
+                    CONVERT token TO INTEGER value
+                    ADD value TO row
+                END FOR
+                IF row.size EQUALS gridSize THEN
+                    ADD row TO bandData
+                ELSE
+                    PRINT "Error: Data row size does not match expected grid size."
+                    RETURN EMPTY LIST
+                END IF
+            END IF
+        END WHILE
+
+        IF bandData IS NOT EMPTY THEN
+            ADD bandData TO data
+        END IF
+
+        IF data IS EMPTY THEN
+            PRINT "Error: No valid data was read from the file."
+        END IF
+
+        RETURN data
+    END FUNCTION
+
+    FUNCTION MAIN
+        SET gridSize TO 6
+        SET minSupport TO 2
+        SET minConfidence TO 0.3
+
+        SET filename TO "sample_data.txt"
+        SET dataset TO CALL readDataset(filename, gridSize)
+
+        IF dataset IS EMPTY THEN
+            PRINT "Error: Dataset is empty or invalid."
+            TERMINATE PROGRAM
+        END IF
+
+        CREATE PARM object parm WITH (gridSize, minSupport, minConfidence)
+        CALL parm.buildPTrees(dataset)
+        CALL parm.mineFrequentItemsets()
+        CALL parm.generateAssociationRules()
+    END FUNCTION
+
+END PROGRAM
+

@@ -1,0 +1,264 @@
+## **Pseudocode for PARM Algorithm**
+
+### **1. PTree Class**
+
+**Purpose:**  
+Represents the P-tree structure used for efficient spatial data mining.
+
+**Attributes:**
+- `rootCount`: Integer representing the total count of '1's in the tree.
+- `tree`: 2D array (vector of vectors) representing the binary grid.
+
+**Methods:**
+
+- **Constructor (`PTree(size)`):**
+  - Initialize `rootCount` to 0.
+  - Resize `tree` to a `size x size` grid filled with zeros.
+
+- **Static Method `AND(ptree1, ptree2)`:**
+  - **Input:** Two P-tree objects (`ptree1`, `ptree2`).
+  - **Output:** A new P-tree object resulting from the element-wise AND of `ptree1` and `ptree2`.
+  - **Process:**
+    1. Initialize a new P-tree `result` with the same size.
+    2. For each cell `(i, j)` in the grid:
+       - `result.tree[i][j] = ptree1.tree[i][j] AND ptree2.tree[i][j]`
+       - Increment `result.rootCount` by `result.tree[i][j]`.
+    3. Return `result`.
+
+- **Method `buildTree(data)`**
+  - **Input:** 2D array `data` representing binary grid values.
+  - **Process:**
+    1. Iterate over each row `i` and each column `j` in `data`.
+    2. Set `tree[i][j] = data[i][j]`.
+    3. Increment `rootCount` by `data[i][j]`.
+
+- **Method `printTree()`**
+  - **Process:**
+    1. Print `rootCount`.
+    2. Iterate over each row in `tree` and print the binary values.
+
+---
+
+### **2. PARM Class**
+
+**Purpose:**  
+Implements the PARM algorithm to mine frequent itemsets and generate association rules from spatial data.
+
+**Attributes:**
+- `bandPtrees`: List of P-tree objects, one for each spectral band.
+- `minSupport`: Integer specifying the minimum support threshold.
+- `minConfidence`: Floating-point number specifying the minimum confidence threshold.
+- `gridSize`: Integer representing the size of the grid (e.g., 6 for a 6x6 grid).
+- `frequentItemsets`: List of pairs, each containing a list of band indices and their support count.
+
+**Methods:**
+
+- **Constructor (`PARM(gridSize, minSupport, minConfidence)`):**
+  - Initialize `gridSize`, `minSupport`, and `minConfidence` with provided values.
+  - Initialize `bandPtrees` and `frequentItemsets` as empty lists.
+
+- **Method `buildPTrees(data)`**
+  - **Input:** 3D array `data` where each element represents a band containing a 2D grid.
+  - **Process:**
+    1. For each `bandData` in `data`:
+       - Create a new P-tree `ptree` with `gridSize`.
+       - Call `ptree.buildTree(bandData)`.
+       - Add `ptree` to `bandPtrees`.
+
+- **Method `mineFrequentItemsets()`**
+  - **Process:**
+    1. Iterate over each pair of bands `(i, j)` where `i < j`:
+       - Perform AND operation: `result = PTree.AND(bandPtrees[i], bandPtrees[j])`.
+       - If `result.rootCount >= minSupport`:
+         - Print information about the frequent itemset between bands `i+1` and `j+1` with its support.
+         - Call `result.printTree()`.
+         - Add the pair `({i, j}, result.rootCount)` to `frequentItemsets`.
+
+- **Method `generateAssociationRules()`**
+  - **Process:**
+    1. Print header "Association Rules:".
+    2. For each `itemsetSupportPair` in `frequentItemsets`:
+       - Let `itemset` be the list of band indices.
+       - Let `supportXY` be the support count of the itemset.
+       - For each `item` in `itemset`:
+         - Initialize empty lists `X` and `Y`.
+         - Split `itemset` into `X` (all items except `item`) and `Y` (only `item`).
+         - Calculate `supportX` as the `rootCount` of the P-tree corresponding to the first item in `X`.
+         - Calculate `confidence = supportXY / supportX`.
+         - If `confidence >= minConfidence`:
+           - Print the association rule in the format: "Rule: {X} -> {Y} with confidence: [confidence]%".
+
+---
+
+### **3. Function: readDataset(filename, gridSize)**
+
+**Purpose:**  
+Reads and parses the dataset from a file, organizing it into bands separated by "----".
+
+**Input:**
+- `filename`: String representing the path to the dataset file.
+- `gridSize`: Integer specifying the expected number of values per row.
+
+**Output:**  
+3D array where each element represents a band containing a 2D grid of integers.
+
+**Process:**
+1. Open the file specified by `filename`.
+2. If the file cannot be opened:
+   - Print an error message and return an empty list.
+3. Initialize an empty list `data` to store all bands.
+4. Initialize an empty list `bandData` to store the current band's rows.
+5. Read the file line by line:
+   - If the line is empty or equals "----":
+     - If `bandData` is not empty:
+       - Add `bandData` to `data`.
+       - Clear `bandData` for the next band.
+   - Else:
+     - Split the line by spaces to extract integer values.
+     - If the number of values equals `gridSize`:
+       - Add the row to `bandData`.
+     - Else:
+       - Print an error message and return an empty list.
+6. After reading all lines:
+   - If `bandData` is not empty:
+     - Add `bandData` to `data`.
+7. If `data` is empty:
+   - Print an error message.
+8. Return `data`.
+
+---
+
+### **4. Main Function**
+
+**Purpose:**  
+Coordinates the execution of the PARM algorithm by reading input data, building P-trees, mining frequent itemsets, and generating association rules.
+
+**Process:**
+1. **Initialize Parameters:**
+   - Set `gridSize` (e.g., 6 for a 6x6 grid).
+   - Set `minSupport` (e.g., 2).
+   - Set `minConfidence` (e.g., 0.6 for 60% confidence).
+
+2. **Read Dataset:**
+   - Define `filename` as "sample_data.txt".
+   - Call `readDataset(filename, gridSize)` to obtain `dataset`.
+   - If `dataset` is empty:
+     - Print an error message and terminate the program.
+
+3. **Initialize PARM Algorithm:**
+   - Create a PARM object `parm` with `gridSize`, `minSupport`, and `minConfidence`.
+
+4. **Build P-trees:**
+   - Call `parm.buildPTrees(dataset)` to construct P-trees for each band.
+
+5. **Mine Frequent Itemsets:**
+   - Call `parm.mineFrequentItemsets()` to identify frequent itemsets based on support.
+
+6. **Generate Association Rules:**
+   - Call `parm.generateAssociationRules()` to create and print association rules based on confidence.
+
+7. **Terminate Program:**
+   - End the program successfully.
+
+---
+
+## **Detailed Explanation**
+
+### **1. PTree Class**
+
+- **Purpose:**  
+  The `PTree` class encapsulates the P-tree structure, which is a 2D binary grid representing spatial data. It includes functionality to perform logical AND operations between two P-trees, build the tree from data, and print the tree's contents.
+
+- **AND Operation:**  
+  The static method `AND` takes two P-tree objects and performs an element-wise logical AND operation. It also calculates the `rootCount` for the resulting P-tree by summing the '1's in the resulting grid.
+
+### **2. PARM Class**
+
+- **Purpose:**  
+  The `PARM` class manages the overall association rule mining process. It holds multiple P-trees (one for each spectral band), mines frequent itemsets based on a minimum support threshold, and generates association rules that meet a minimum confidence threshold.
+
+- **Building P-trees:**  
+  The `buildPTrees` method constructs P-trees for each spectral band from the dataset.
+
+- **Mining Frequent Itemsets:**  
+  The `mineFrequentItemsets` method iterates through all possible pairs of bands, performs an AND operation on their corresponding P-trees, and identifies frequent itemsets that meet or exceed the `minSupport` threshold.
+
+- **Generating Association Rules:**  
+  The `generateAssociationRules` method takes the identified frequent itemsets and generates all possible association rules. For each rule, it calculates the confidence and prints the rule if the confidence meets or exceeds the `minConfidence` threshold.
+
+### **3. readDataset Function**
+
+- **Purpose:**  
+  Reads the dataset from a file (`sample_data.txt`), parses it into a 3D array structure, and separates different bands using the "----" delimiter.
+
+- **Process:**
+  - Opens the specified file.
+  - Reads the file line by line.
+  - Splits each line into integer values, ensuring each row matches the expected `gridSize`.
+  - Separates different bands based on the "----" delimiter.
+  - Returns the organized 3D array representing the dataset.
+
+### **4. Main Function**
+
+- **Process:**
+  1. **Initialization:**
+     - Sets the grid size (`gridSize`) to 6 (since each row in `sample_data.txt` has 6 values).
+     - Sets the minimum support (`minSupport`) to 2.
+     - Sets the minimum confidence (`minConfidence`) to 0.6 (60%).
+
+  2. **Data Reading:**
+     - Calls `readDataset` to read and parse the data from `sample_data.txt`.
+     - Checks if the dataset is valid and non-empty.
+
+  3. **PARM Initialization and Execution:**
+     - Initializes a `PARM` object with the specified parameters.
+     - Builds P-trees from the dataset.
+     - Mines frequent itemsets based on the support threshold.
+     - Generates and prints association rules based on the confidence threshold.
+
+---
+
+## **Sample Output**
+
+Given the provided `sample_data.txt`, the expected output of the program should resemble the following format:
+
+```
+Frequent Itemsets and Association Rules:
+Frequent itemset found between band 1 and band 2: Support = 3
+P-tree root count: 3
+0 0 0 0 0 0 
+0 0 1 0 0 0 
+1 0 0 1 0 1 
+0 0 0 0 0 0 
+Frequent itemset found between band 1 and band 3: Support = 5
+P-tree root count: 5
+1 0 0 0 0 0 
+0 1 0 0 0 0 
+1 0 1 1 0 0 
+0 0 0 0 0 0 
+Frequent itemset found between band 2 and band 3: Support = 3
+P-tree root count: 3
+0 1 0 0 0 0 
+0 0 0 0 0 0 
+1 0 0 1 0 1 
+0 0 0 0 0 0 
+
+Association Rules:
+Rule: {1 } -> {3 } with confidence: 60%
+Rule: {3 } -> {1 } with confidence: 60%
+Rule: {2 } -> {3 } with confidence: 60%
+Rule: {3 } -> {2 } with confidence: 60%
+```
+
+**Note:**
+- **Band Indexing:**  
+  Bands are 1-based indexed in the output for readability, matching typical human conventions (i.e., Band 1, Band 2, etc.).
+
+- **Association Rules:**  
+  Rules are generated for each frequent itemset where the confidence meets or exceeds the `minConfidence` threshold.
+
+---
+
+## **Conclusion**
+
+This pseudocode provides a high-level overview of the PARM algorithm implementation in C++. It covers reading and parsing the dataset, building P-trees, mining frequent itemsets, and generating association rules based on specified support and confidence thresholds. By following this pseudocode, you can better understand the flow of the program and implement or modify it as needed.
